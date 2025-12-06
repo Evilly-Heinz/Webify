@@ -22,15 +22,15 @@ const storage = {
     await this.saveProjects(projects);
   },
 
-  async deleteProject(id) {
+  async deleteProject(storeName) {
     const projects = await this.getProjects();
-    const filtered = projects.filter(p => p.id !== id);
+    const filtered = projects.filter(p => p.storeName.toLowerCase() !== storeName.toLowerCase());
     await this.saveProjects(filtered);
   },
 
-  async updateProject(id, updatedProject) {
+  async updateProject(storeName, updatedProject) {
     const projects = await this.getProjects();
-    const index = projects.findIndex(p => p.id === id);
+    const index = projects.findIndex(p => p.storeName.toLowerCase() === storeName.toLowerCase());
     if (index !== -1) {
       projects[index] = { 
         ...projects[index], 
@@ -41,9 +41,9 @@ const storage = {
     }
   },
 
-  async togglePin(id) {
+  async togglePin(storeName) {
     const projects = await this.getProjects();
-    const index = projects.findIndex(p => p.id === id);
+    const index = projects.findIndex(p => p.storeName.toLowerCase() === storeName.toLowerCase());
     if (index !== -1) {
       projects[index].pinned = !projects[index].pinned;
       projects[index].lastUpdated = Date.now();
@@ -51,9 +51,9 @@ const storage = {
     }
   },
 
-  async updateLastAccessed(id) {
+  async updateLastAccessed(storeName) {
     const projects = await this.getProjects();
-    const index = projects.findIndex(p => p.id === id);
+    const index = projects.findIndex(p => p.storeName.toLowerCase() === storeName.toLowerCase());
     if (index !== -1) {
       projects[index].lastUpdated = Date.now();
       await this.saveProjects(projects);

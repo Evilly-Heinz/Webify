@@ -94,7 +94,7 @@ async function loadProjects() {
 
 async function handleProjectAction(action, project) {
   // Update last accessed time
-  await storage.updateLastAccessed(project.id);
+  await storage.updateLastAccessed(project.storeName);
   
   let url = '';
 

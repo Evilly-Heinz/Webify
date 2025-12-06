@@ -1,6 +1,6 @@
 // Settings page script for managing projects
 
-let editingProjectId = null;
+let editingStoreName = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('projectForm');
@@ -18,6 +18,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load existing projects
   await loadProjects();
+
+  // Add event delegation for all buttons (only once)
+  projectsList.addEventListener('click', async (e) => {
+    const button = e.target.closest('button[data-action]');
+    if (!button) return;
+
+    const action = button.dataset.action;
+    const storeName = button.dataset.storeName;
+
+    if (action === 'pin') {
+      await togglePin(storeName);
+    } else if (action === 'edit') {
+      await editProject(storeName);
+    } else if (action === 'delete') {
+      await deleteProject(storeName);
+    } else if (action === 'open') {
+      const openAction = button.dataset.openAction;
+      await openProject(storeName, openAction);
+    }
+  });
 
   // Handle form submission
   form.addEventListener('submit', async (e) => {
@@ -37,14 +57,34 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    if (editingProjectId) {
+    if (editingStoreName) {
       // Update existing project
-      await storage.updateProject(editingProjectId, project);
+      // Check if store name is being changed and if new name already exists
+      if (editingStoreName.toLowerCase() !== project.storeName.toLowerCase()) {
+        const existingProjects = await storage.getProjects();
+        const duplicate = existingProjects.find(p => 
+          p.storeName.toLowerCase() === project.storeName.toLowerCase() &&
+          p.storeName.toLowerCase() !== editingStoreName.toLowerCase()
+        );
+        if (duplicate) {
+          alert('A project with this store name already exists. Please use a different store name.');
+          return;
+        }
+      }
+      await storage.updateProject(editingStoreName, project);
       showMessage('Project updated successfully!', 'success');
-      editingProjectId = null;
+      editingStoreName = null;
       document.querySelector('.form-actions button[type="submit"]').textContent = 'Add Project';
     } else {
-      // Add new project
+      // Add new project - check for duplicates
+      const existingProjects = await storage.getProjects();
+      const duplicate = existingProjects.find(p => 
+        p.storeName.toLowerCase() === project.storeName.toLowerCase()
+      );
+      if (duplicate) {
+        alert('A project with this store name already exists. Please use a different store name or edit the existing project.');
+        return;
+      }
       await storage.addProject(project);
       showMessage('Project added successfully!', 'success');
     }
@@ -68,7 +108,7 @@ async function loadProjects() {
   }
 
   projectsList.innerHTML = sortedProjects.map(project => `
-    <div class="project-item ${project.pinned ? 'pinned' : ''}" data-id="${project.id}">
+    <div class="project-item ${project.pinned ? 'pinned' : ''}" data-store-name="${escapeHtml(project.storeName)}">
       <div class="project-item-header">
         <div class="project-item-info">
           <div style="display: flex; align-items: center; gap: 8px;">
@@ -81,63 +121,45 @@ async function loadProjects() {
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
           <div class="project-item-actions">
-            <button class="btn-icon btn-admin" data-action="open" data-id="${project.id}" data-open-action="admin" title="Go to Admin">⚙️</button>
-            <button class="btn-icon btn-preview" data-action="open" data-id="${project.id}" data-open-action="preview" title="Preview">👁️</button>
-            <button class="btn-icon btn-view" data-action="open" data-id="${project.id}" data-open-action="view" title="View">🌐</button>
+            <button class="btn-icon btn-admin" data-action="open" data-store-name="${escapeHtml(project.storeName)}" data-open-action="admin" title="Go to Admin">⚙️</button>
+            <button class="btn-icon btn-preview" data-action="open" data-store-name="${escapeHtml(project.storeName)}" data-open-action="preview" title="Preview">👁️</button>
+            <button class="btn-icon btn-view" data-action="open" data-store-name="${escapeHtml(project.storeName)}" data-open-action="view" title="View">🌐</button>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-pin btn-small" data-action="pin" data-id="${project.id}" title="${project.pinned ? 'Unpin' : 'Pin'}">
+            <button class="btn btn-pin btn-small" data-action="pin" data-store-name="${escapeHtml(project.storeName)}" title="${project.pinned ? 'Unpin' : 'Pin'}">
               ${project.pinned ? '📌' : '📍'}
             </button>
-            <button class="btn btn-edit btn-small" data-action="edit" data-id="${project.id}">Edit</button>
-            <button class="btn btn-danger btn-small" data-action="delete" data-id="${project.id}">Delete</button>
+            <button class="btn btn-edit btn-small" data-action="edit" data-store-name="${escapeHtml(project.storeName)}">Edit</button>
+            <button class="btn btn-danger btn-small" data-action="delete" data-store-name="${escapeHtml(project.storeName)}">Delete</button>
           </div>
         </div>
       </div>
     </div>
   `).join('');
-
-  // Add event delegation for all buttons
-  projectsList.addEventListener('click', async (e) => {
-    const button = e.target.closest('button[data-action]');
-    if (!button) return;
-
-    const action = button.dataset.action;
-    const id = button.dataset.id;
-
-    if (action === 'pin') {
-      await togglePin(id);
-    } else if (action === 'edit') {
-      await editProject(id);
-    } else if (action === 'delete') {
-      await deleteProject(id);
-    } else if (action === 'open') {
-      const openAction = button.dataset.openAction;
-      await openProject(id, openAction);
-    }
-  });
 }
 
-async function deleteProject(id) {
+async function deleteProject(storeName) {
   if (!confirm('Are you sure you want to delete this project?')) {
     return;
   }
 
-  await storage.deleteProject(id);
+  await storage.deleteProject(storeName);
   await loadProjects();
   showMessage('Project deleted successfully!', 'success');
 }
 
-async function editProject(id) {
+async function editProject(storeName) {
   const projects = await storage.getProjects();
-  const project = projects.find(p => p.id === id);
+  const project = projects.find(p => p.storeName.toLowerCase() === storeName.toLowerCase());
   
   if (!project) {
-    alert('Project not found');
+    // Project was deleted, reload the list to remove it from display
+    await loadProjects();
+    showMessage('Project not found. The list has been refreshed.', 'error');
     return;
   }
 
-  editingProjectId = id;
+  editingStoreName = storeName;
   document.getElementById('projectName').value = project.name;
   document.getElementById('storeName').value = project.storeName;
   document.getElementById('devThemeId').value = project.devThemeId || '';
@@ -149,22 +171,33 @@ async function editProject(id) {
   document.getElementById('projectForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function togglePin(id) {
-  await storage.togglePin(id);
+async function togglePin(storeName) {
+  const projects = await storage.getProjects();
+  const project = projects.find(p => p.storeName.toLowerCase() === storeName.toLowerCase());
+  
+  if (!project) {
+    // Project was deleted, reload the list to remove it from display
+    await loadProjects();
+    return;
+  }
+
+  await storage.togglePin(storeName);
   await loadProjects();
 }
 
-async function openProject(id, action) {
+async function openProject(storeName, action) {
   const projects = await storage.getProjects();
-  const project = projects.find(p => p.id === id);
+  const project = projects.find(p => p.storeName.toLowerCase() === storeName.toLowerCase());
   
   if (!project) {
-    alert('Project not found');
+    // Project was deleted, reload the list to remove it from display
+    await loadProjects();
+    showMessage('Project not found. The list has been refreshed.', 'error');
     return;
   }
 
   // Update last accessed time
-  await storage.updateLastAccessed(id);
+  await storage.updateLastAccessed(storeName);
   await loadProjects();
 
   let url = '';
