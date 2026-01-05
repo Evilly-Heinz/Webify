@@ -108,7 +108,7 @@ async function createContextMenu() {
   chrome.contextMenus.create({
     id: CONTEXT_MENU_IDS.THEME_EDITOR,
     parentId: CONTEXT_MENU_IDS.PARENT,
-    title: 'Go to theme editor',
+    title: 'Edit theme',
     contexts: ['page'],
     documentUrlPatterns: ['https://*.myshopify.com/*']
   });
@@ -256,11 +256,24 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       // Build theme editor URL using theme ID from page
       let themeEditorUrl = `https://admin.shopify.com/store/${project.storeName}/themes/${themeId}/editor`;
       
+      // Check if current URL has view query parameter
+      const viewParam = url.searchParams.get('view');
+      const hasViewParam = viewParam !== null;
+      
       // Add previewPath only if path is not empty
       if (path) {
-        // Encode path: add leading slash and encode
-        const encodedPath = encodeURIComponent(`/${path}`);
+        // Build path with view parameter if it exists
+        let pathWithQuery = `/${path}`;
+        if (hasViewParam) {
+          // Append view parameter to path (will be encoded: ? becomes %3F, = becomes %3D)
+          pathWithQuery += `?view=${viewParam}`;
+        }
+        // Encode the entire path (including query if present)
+        const encodedPath = encodeURIComponent(pathWithQuery);
         themeEditorUrl += `?previewPath=${encodedPath}`;
+      } else if (hasViewParam) {
+        // If no path but view param exists, add it as query parameter
+        themeEditorUrl += `?view=${encodeURIComponent(viewParam)}`;
       }
 
       chrome.tabs.create({ url: themeEditorUrl });
